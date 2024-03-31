@@ -95,13 +95,14 @@ According to `man dlopen(3)`
 
 And dart code currently uses `dlopen` in `void* Utils::LoadDynamicLibrary(const char* library_path, char** error) {` [as can be seen here](https://github.com/dart-lang/sdk/blob/9b2b0ac848af91baef45cd56c5b030fa3ef53c0b/runtime/platform/utils.cc#L298).
 
-My proposed solution is to replace `handle = dlopen(library_path, RTLD_LAZY);` with `handle = dlmopen(library_path, RTLD_LAZY, LM_ID_NEWLM);`.
+My proposed solution is to replace `handle = dlopen(library_path, RTLD_LAZY);` with `handle = dlmopen(LM_ID_NEWLM, library_path, RTLD_LAZY);`.
 
+I got some compilation issues regarding the use of LM_ID_NEWLM, so I've hardcoded it to `-1` (according to `/usr/include/dlfcn.h` on ubuntu 20.04).
 
 ```patch
-From 607066f55296f67a2e8cd9991bcb4a0a06d6e191 Mon Sep 17 00:00:00 2001
+From eb86b73c22489e6647b2fffe2ed7207ddeb27e02 Mon Sep 17 00:00:00 2001
 From: Czarek Nakamoto <cyjan@mrcyjanek.net>
-Date: Sun, 31 Mar 2024 17:33:23 +0200
+Date: Sun, 31 Mar 2024 17:37:09 +0200
 Subject: [PATCH] Isolate libraries when loading
 
 ---
@@ -109,7 +110,7 @@ Subject: [PATCH] Isolate libraries when loading
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/runtime/platform/utils.cc b/runtime/platform/utils.cc
-index e7179ed8040..b89ff607db3 100644
+index e7179ed8040..b81bd594374 100644
 --- a/runtime/platform/utils.cc
 +++ b/runtime/platform/utils.cc
 @@ -295,7 +295,7 @@ void* Utils::LoadDynamicLibrary(const char* library_path, char** error) {
@@ -117,10 +118,15 @@ index e7179ed8040..b89ff607db3 100644
  #if defined(DART_HOST_OS_LINUX) || defined(DART_HOST_OS_MACOS) ||              \
      defined(DART_HOST_OS_ANDROID) || defined(DART_HOST_OS_FUCHSIA)
 -  handle = dlopen(library_path, RTLD_LAZY);
-+  handle = dlmopen(library_path, RTLD_LAZY, LM_ID_NEWLM);
++  handle = dlmopen(-1, library_path, RTLD_LAZY);
  #elif defined(DART_HOST_OS_WINDOWS)
    SetLastError(0);  // Clear any errors.
  
 -- 
 2.25.1
+
+
 ```
+
+
+undefined symbol: pthread_getspecific
